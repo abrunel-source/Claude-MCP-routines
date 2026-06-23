@@ -16,7 +16,15 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   readonly client = this.base.$extends(tenantScopeExtension());
 
   async onModuleInit(): Promise<void> {
-    await this.base.$connect();
+    // Non-fatal: in serverless/cold environments DATABASE_URL may be unset or the
+    // DB briefly unreachable. Prisma connects lazily on first query, so we don't
+    // block app boot — health endpoints surface DB status separately.
+    try {
+      await this.base.$connect();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('Prisma initial connect failed (will retry lazily):', (err as Error).message);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {

@@ -36,19 +36,26 @@ export class TenantContextMiddleware implements NestMiddleware {
 
     if (!isPlatformHost || headerSlug) {
       slug = headerSlug ?? this.subdomainOf(hostname);
-      if (slug) {
-        const tenant = await this.prisma.raw.tenant.findUnique({ where: { slug } });
-        if (tenant) {
-          tenantId = tenant.id;
+      try {
+        if (slug) {
+          const tenant = await this.prisma.raw.tenant.findUnique({ where: { slug } });
+          if (tenant) {
+            tenantId = tenant.id;
+          }
         }
-      }
-      if (!tenantId && !isPlatformHost) {
-        const domain = await this.prisma.raw.customDomain.findUnique({
-          where: { domain: hostname },
-        });
-        if (domain) {
-          tenantId = domain.tenantId;
+        if (!tenantId && !isPlatformHost) {
+          const domain = await this.prisma.raw.customDomain.findUnique({
+            where: { domain: hostname },
+          });
+          if (domain) {
+            tenantId = domain.tenantId;
+          }
         }
+      } catch (err) {
+        // DB unreachable/unconfigured: degrade to the platform surface rather
+        // than failing every request. Tenant routes will still error per-request.
+        // eslint-disable-next-line no-console
+        console.warn('Tenant resolution skipped (DB unavailable):', (err as Error).message);
       }
     }
 
