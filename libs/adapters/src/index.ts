@@ -11,4 +11,5 @@ export * from './accounting/xero-accounting.provider';
 export * from './notification/mock-notification.service';
 export * from './notification/resend-notification.service';
 export * from './storage/s3-storage.service';
+export * from './storage/in-memory-storage.service';
 export * from './document/pdfmake-document.service';

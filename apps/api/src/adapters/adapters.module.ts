@@ -16,6 +16,7 @@ import {
   MockNotificationService,
   ResendNotificationService,
   S3StorageService,
+  InMemoryStorageService,
   PdfmakeDocumentService,
 } from '@cadence/adapters';
 import { env } from '../config/env';
@@ -61,7 +62,12 @@ import { env } from '../config/env';
     },
     {
       provide: STORAGE_SERVICE,
-      useFactory: () => new S3StorageService(env.s3),
+      // Use real S3 when an endpoint + credentials are configured; otherwise an
+      // in-memory double so signed-PDF flows run end-to-end (see HANDOFF).
+      useFactory: () =>
+        env.s3.endpoint && env.s3.accessKeyId
+          ? new S3StorageService(env.s3)
+          : new InMemoryStorageService(),
     },
     {
       provide: DOCUMENT_SERVICE,

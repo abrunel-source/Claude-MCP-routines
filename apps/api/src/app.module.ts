@@ -5,11 +5,23 @@ import { AdaptersModule } from './adapters/adapters.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { TenancyModule } from './tenancy/tenancy.module';
+import { CrmModule } from './crm/crm.module';
+import { LibraryModule } from './library/library.module';
+import { ProposalsModule } from './proposals/proposals.module';
 import { TenantContextMiddleware } from './tenancy/tenant-context.middleware';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 
 @Module({
-  imports: [PrismaModule, AdaptersModule, HealthModule, AuthModule, TenancyModule],
+  imports: [
+    PrismaModule,
+    AdaptersModule,
+    HealthModule,
+    AuthModule,
+    TenancyModule,
+    CrmModule,
+    LibraryModule,
+    ProposalsModule,
+  ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
