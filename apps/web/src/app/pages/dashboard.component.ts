@@ -52,7 +52,14 @@ export class DashboardComponent implements OnInit {
         this.api.setToken(res.accessToken);
         this.loadMe();
       },
-      error: () => this.error.set('Could not start demo session.'),
+      error: (err) => {
+        const status = err?.status ?? 'ERR';
+        let detail = err?.error?.message || err?.message || '';
+        if (typeof err?.error === 'string' && /<!doctype|<html/i.test(err.error)) {
+          detail = 'API returned HTML (routing issue)';
+        }
+        this.error.set(`Demo session failed (${status}). ${detail}`);
+      },
     });
   }
 

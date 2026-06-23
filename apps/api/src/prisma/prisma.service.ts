@@ -8,16 +8,27 @@ import { tenantScopeExtension } from '@cadence/core';
  * version, so we accept all of them and fall back to DATABASE_URL.
  */
 function resolveDatabaseUrl(): string {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.DATABASE_URL_UNPOOLED ||
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.POSTGRES_URL ||
-    // Valid-format placeholder so PrismaClient construction never throws when no
-    // database is configured; queries fail gracefully and are caught at runtime.
-    'postgresql://unconfigured:unconfigured@127.0.0.1:5432/unconfigured'
-  );
+  // Prefer a DIRECT (non-pooling) connection. Vercel Postgres / Neon poolers run
+  // PgBouncer in transaction mode, which breaks Prisma's prepared statements
+  // unless `pgbouncer=true` is set — using the direct URL avoids that entirely
+  // and is fine for this app's load.
+  const direct =
+    process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING;
+  if (direct) return direct;
+
+  const pooled =
+    process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
+  if (pooled) {
+    // If it's a pooled endpoint, make Prisma PgBouncer-safe.
+    if (/-pooler\.|pgbouncer/.test(pooled) && !/pgbouncer=true/.test(pooled)) {
+      return pooled + (pooled.includes('?') ? '&' : '?') + 'pgbouncer=true';
+    }
+    return pooled;
+  }
+
+  // Valid-format placeholder so PrismaClient construction never throws when no
+  // database is configured; queries fail gracefully and are caught at runtime.
+  return 'postgresql://unconfigured:unconfigured@127.0.0.1:5432/unconfigured';
 }
 
 /**
