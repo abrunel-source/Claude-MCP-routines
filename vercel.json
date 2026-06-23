@@ -5,10 +5,13 @@
   "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "public",
   "functions": {
-    "api/[[...path]].js": {
+    "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "dist/apps/api/**"
     }
   },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
