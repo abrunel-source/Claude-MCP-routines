@@ -15,10 +15,5 @@ prisma/*.db
 *.tsbuildinfo
 .vercel
 
-# Vercel SPA output (copied from dist/apps/web by vercel-build)
-/web
-
-# Vercel static output (copied from dist/apps/web)
-/public
-/apps/web/public
-/apps/web/dist
+# NOTE: the Vercel static output dir (public/) must NOT be gitignored — Vercel's
+# output collection respects .gitignore and would treat it as empty.
