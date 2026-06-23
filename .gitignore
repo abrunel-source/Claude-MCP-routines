@@ -17,3 +17,6 @@ prisma/*.db
 
 # Vercel SPA output (copied from dist/apps/web by vercel-build)
 /web
+
+# Vercel static output (copied from dist/apps/web)
+/public
