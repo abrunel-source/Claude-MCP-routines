@@ -1,0 +1,16 @@
+node_modules
+dist
+tmp
+.nx/cache
+.nx/workspace-data
+coverage
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+.angular
+apps/web/.angular
+prisma/*.db
+*.tsbuildinfo
+.vercel

@@ -1,0 +1,59 @@
+{
+  "name": "cadence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cadence — multi-tenant white-label SaaS for South African professional-services billing (sell, sign, bill, get paid).",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "nx run api:build",
+    "test": "jest --config apps/api/jest.config.js --passWithNoTests",
+    "lint": "eslint \"apps/**/src/**/*.ts\" \"libs/**/src/**/*.ts\"",
+    "typecheck": "tsc -p apps/api/tsconfig.json --noEmit",
+    "api:dev": "nx run api:serve",
+    "web:dev": "nx run web:serve",
+    "dev": "nx run-many -t serve --projects=api,web --parallel=2",
+    "db:up": "docker compose up -d postgres",
+    "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:seed": "ts-node --project apps/api/tsconfig.json prisma/seed.ts",
+    "prepare": "husky || true"
+  },
+  "devDependencies": {
+    "@nx/eslint": "20.3.0",
+    "@nx/jest": "20.3.0",
+    "@nx/js": "20.3.0",
+    "@types/jest": "29.5.14",
+    "@types/node": "20.17.10",
+    "@typescript-eslint/eslint-plugin": "8.18.1",
+    "@typescript-eslint/parser": "8.18.1",
+    "eslint": "8.57.1",
+    "husky": "9.1.7",
+    "jest": "29.7.0",
+    "nx": "20.3.0",
+    "prettier": "3.4.2",
+    "prisma": "6.1.0",
+    "ts-jest": "29.2.5",
+    "ts-loader": "9.5.1",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.3"
+  },
+  "dependencies": {
+    "@prisma/client": "6.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "nx",
+      "prisma",
+      "@scarf/scarf"
+    ]
+  }
+}

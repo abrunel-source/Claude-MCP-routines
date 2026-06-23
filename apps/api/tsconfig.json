@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": false,
+    "outDir": "../../dist/apps/api",
+    "baseUrl": "./",
+    "types": ["node", "jest"],
+    "paths": {
+      "@cadence/shared-types": ["../../libs/shared-types/src/index.ts"],
+      "@cadence/core": ["../../libs/core/src/index.ts"],
+      "@cadence/adapters": ["../../libs/adapters/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../libs/**/*.ts", "../../prisma/seed.ts"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

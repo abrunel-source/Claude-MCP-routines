@@ -1,0 +1,968 @@
+// ============================================================================
+// Cadence — Prisma schema (PostgreSQL 15+, standard features only).
+// Multi-tenant: every tenant-owned table carries `tenantId` and is auto-scoped
+// by the Prisma client extension (see libs/core tenancy) + Postgres RLS.
+// Monetary amounts are stored in minor units (cents) as Int, currency on record.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+enum Role {
+  platform_admin
+  firm_owner
+  firm_admin
+  firm_member
+  firm_readonly
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  suspended
+}
+
+enum PlanTier {
+  starter
+  growth
+  scale
+}
+
+enum BillingInterval {
+  monthly
+  annual
+}
+
+enum TaxMode {
+  inclusive
+  exclusive
+}
+
+enum DealStage {
+  lead
+  qualified
+  proposal_sent
+  won
+  lost
+}
+
+enum ActivityType {
+  note
+  task
+  call
+  email
+  meeting
+}
+
+enum PricingType {
+  fixed
+  recurring
+  usage
+}
+
+enum RecurringInterval {
+  weekly
+  monthly
+  quarterly
+  annual
+}
+
+enum ProposalStatus {
+  draft
+  sent
+  delivered
+  viewed
+  package_selected
+  signed
+  declined
+  expired
+}
+
+enum ProposalEventType {
+  created
+  sent
+  delivered
+  first_viewed
+  step_viewed
+  package_selected
+  terms_accepted
+  signed
+  declined
+}
+
+enum InvoiceKind {
+  full
+  partial
+  deposit
+  progress
+  recurring
+}
+
+enum InvoiceStatus {
+  draft
+  issued
+  viewed
+  paid
+  partially_paid
+  overdue
+  void
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  succeeded
+  failed
+  refunded
+}
+
+enum MandateStatus {
+  pending
+  active
+  rejected
+  cancelled
+}
+
+enum JobStatus {
+  pending
+  running
+  succeeded
+  failed
+  dead
+}
+
+enum FormFieldType {
+  text
+  textarea
+  email
+  phone
+  number
+  select
+  checkbox
+  date
+}
+
+// ---------------------------------------------------------------------------
+// Platform (Layer A — Brunel charges firms)
+// ---------------------------------------------------------------------------
+model Plan {
+  id            String          @id @default(cuid())
+  tier          PlanTier
+  name          String
+  priceCents    Int
+  currency      String          @default("ZAR")
+  interval      BillingInterval @default(monthly)
+  annualDiscountPct Int         @default(0)
+  // limits
+  seatLimit     Int
+  proposalsPerMonth Int
+  clientLimit   Int
+  features      Json            @default("{}")
+  active        Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  subscriptions TenantSubscription[]
+
+  @@unique([tier, interval])
+}
+
+model TenantSubscription {
+  id            String             @id @default(cuid())
+  tenantId      String             @unique
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          Plan               @relation(fields: [planId], references: [id])
+  status        SubscriptionStatus @default(trialing)
+  interval      BillingInterval    @default(monthly)
+  trialEndsAt   DateTime?
+  currentPeriodStart DateTime      @default(now())
+  currentPeriodEnd   DateTime?
+  stitchMandateRef   String?
+  canceledAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  invoices      PlatformInvoice[]
+}
+
+model PlatformInvoice {
+  id            String        @id @default(cuid())
+  subscriptionId String
+  subscription  TenantSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenantId      String
+  amountCents   Int
+  currency      String        @default("ZAR")
+  status        InvoiceStatus @default(issued)
+  periodStart   DateTime
+  periodEnd     DateTime
+  issuedAt      DateTime      @default(now())
+  paidAt        DateTime?
+
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Tenant
+// ---------------------------------------------------------------------------
+model Tenant {
+  id            String          @id @default(cuid())
+  name          String
+  slug          String          @unique // subdomain: <slug>.cadence.co.za
+  supportEmail  String?
+  status        String          @default("active") // active | suspended
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  branding      TenantBranding?
+  settings      TenantSettings?
+  subscription  TenantSubscription?
+  customDomains CustomDomain[]
+  taxRates      TaxRate[]
+  paymentCredential TenantPaymentCredential?
+  accountingConnection TenantAccountingConnection?
+  memberships   Membership[]
+  invitations   Invitation[]
+  organizations Organization[]
+  contacts      Contact[]
+  deals         Deal[]
+  activities    Activity[]
+  tags          Tag[]
+  services      Service[]
+  servicePackages ServicePackage[]
+  coverLetters  CoverLetter[]
+  termsTemplates TermsTemplate[]
+  emailTemplates EmailTemplate[]
+  documentTemplates DocumentTemplate[]
+  proposalTemplates ProposalTemplate[]
+  proposals     Proposal[]
+  invoices      Invoice[]
+  billingSchedules BillingSchedule[]
+  mandates      ClientPaymentMandate[]
+  forms         Form[]
+  auditLogs     AuditLog[]
+}
+
+model TenantBranding {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companyName   String
+  logoUrl       String?
+  primaryColor  String   @default("#1f6feb")
+  secondaryColor String  @default("#0b3d91")
+  supportEmail  String?
+  updatedAt     DateTime @updatedAt
+}
+
+model TenantSettings {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultCurrency String @default("ZAR")
+  defaultTaxMode TaxMode @default(inclusive)
+  resendFromEmail String?
+  featureFlags  Json     @default("{}")
+  updatedAt     DateTime @updatedAt
+}
+
+model CustomDomain {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  domain        String   @unique
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model TaxRate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String   // e.g. "VAT"
+  ratePct       Decimal  @db.Decimal(5, 2) // 15.00
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model TenantPaymentCredential {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // AES-256-GCM encrypted blobs (KeyProvider); never store plaintext.
+  clientIdEnc       String
+  clientSecretEnc   String
+  signingKeyEnc     String?
+  connected     Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+}
+
+model TenantAccountingConnection {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider      String   @default("xero")
+  accessTokenEnc  String
+  refreshTokenEnc String
+  tenantRef     String?  // Xero tenantId
+  expiresAt     DateTime?
+  connected     Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String?
+  lastName      String?
+  emailVerified Boolean  @default(false)
+  isPlatformAdmin Boolean @default(false)
+  lastLoginAt   DateTime?
+  failedLoginCount Int    @default(0)
+  lockedUntil   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+  emailVerifications EmailVerification[]
+  passwordResets PasswordReset[]
+}
+
+model Membership {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role          Role
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model RefreshToken {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique
+  family        String   // rotation family
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Invitation {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email         String
+  role          Role
+  tokenHash     String   @unique
+  acceptedAt    DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model EmailVerification {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+}
+
+model PasswordReset {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------------
+model Organization {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  website       String?
+  vatNumber     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  contacts      Contact[]
+  deals         Deal[]
+
+  @@index([tenantId])
+}
+
+model Contact {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  firstName     String
+  lastName      String?
+  email         String
+  phone         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deals         Deal[]
+  activities    Activity[]
+
+  @@index([tenantId])
+  @@index([tenantId, email])
+}
+
+model Deal {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title         String
+  stage         DealStage @default(lead)
+  valueCents    Int       @default(0)
+  currency      String    @default("ZAR")
+  position      Int       @default(0) // kanban ordering within stage
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  activities    Activity[]
+  proposals     Proposal[]
+
+  @@index([tenantId])
+  @@index([tenantId, stage])
+}
+
+model Activity {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type          ActivityType
+  subject       String
+  body          String?
+  dueAt         DateTime?
+  completedAt   DateTime?
+  dealId        String?
+  deal          Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Tag {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  color         String   @default("#888888")
+
+  @@unique([tenantId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Reusable content (Library)
+// ---------------------------------------------------------------------------
+model Service {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  pricingType   PricingType @default(fixed)
+  defaultPriceCents Int
+  currency      String   @default("ZAR")
+  taxMode       TaxMode  @default(inclusive)
+  taxRatePct    Decimal  @db.Decimal(5, 2) @default(15.00)
+  recurringInterval RecurringInterval?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  packageItems  ServicePackageItem[]
+
+  @@index([tenantId])
+}
+
+model ServicePackage {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  currency      String   @default("ZAR")
+  isRecurring   Boolean  @default(false)
+  recurringInterval RecurringInterval?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  items         ServicePackageItem[]
+
+  @@index([tenantId])
+}
+
+model ServicePackageItem {
+  id            String   @id @default(cuid())
+  packageId     String
+  package       ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name          String   // snapshot of service name (one-off custom allowed)
+  description   String?
+  quantity      Int      @default(1)
+  unitPriceCents Int
+  taxMode       TaxMode  @default(inclusive)
+  taxRatePct    Decimal  @db.Decimal(5, 2) @default(15.00)
+  position      Int      @default(0)
+
+  @@index([packageId])
+}
+
+model CoverLetter {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  body          String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model TermsTemplate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  body          String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model EmailTemplate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  subject       String
+  body          String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DocumentTemplate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  body          String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Engagements (Proposals)
+// ---------------------------------------------------------------------------
+model ProposalTemplate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  coverLetterId String?
+  termsTemplateId String?
+  packageIds    String[] // referenced ServicePackage ids
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Proposal {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dealId        String?
+  deal          Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  number        String   // human reference e.g. PROP-0001
+  title         String
+  status        ProposalStatus @default(draft)
+  // prospect
+  prospectName  String
+  prospectEmail String
+  // content snapshot
+  coverLetterBody String
+  termsBody     String
+  currency      String   @default("ZAR")
+  // unique signed link
+  publicTokenHash String @unique
+  expiresAt     DateTime?
+  sentAt        DateTime?
+  firstViewedAt DateTime?
+  viewCount     Int      @default(0)
+  signedAt      DateTime?
+  declinedAt    DateTime?
+  selectedOptionId String?
+  upfrontAmountCents Int  @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  packageOptions ProposalPackageOption[]
+  addOns        AddOn[]
+  events        ProposalEvent[]
+  signature     SignatureEvent?
+  signedDocument SignedDocument?
+  invoices      Invoice[]
+  billingSchedules BillingSchedule[]
+  mandate       ClientPaymentMandate?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model ProposalPackageOption {
+  id            String   @id @default(cuid())
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  // snapshot of a ServicePackage at send time
+  sourcePackageId String?
+  name          String
+  description   String?
+  isRecurring   Boolean  @default(false)
+  recurringInterval RecurringInterval?
+  position      Int      @default(0)
+  lineItems     ProposalLineItem[]
+
+  @@index([proposalId])
+}
+
+model ProposalLineItem {
+  id            String   @id @default(cuid())
+  optionId      String
+  option        ProposalPackageOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  quantity      Int      @default(1)
+  unitPriceCents Int
+  taxMode       TaxMode  @default(inclusive)
+  taxRatePct    Decimal  @db.Decimal(5, 2) @default(15.00)
+  position      Int      @default(0)
+
+  @@index([optionId])
+}
+
+model AddOn {
+  id            String   @id @default(cuid())
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  priceCents    Int
+  taxMode       TaxMode  @default(inclusive)
+  taxRatePct    Decimal  @db.Decimal(5, 2) @default(15.00)
+  selected      Boolean  @default(false)
+
+  @@index([proposalId])
+}
+
+model ProposalEvent {
+  id            String   @id @default(cuid())
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  type          ProposalEventType
+  step          Int?
+  ipAddress     String?
+  userAgent     String?
+  occurredAt    DateTime @default(now()) // UTC
+
+  @@index([proposalId])
+}
+
+model SignatureEvent {
+  id            String   @id @default(cuid())
+  proposalId    String   @unique
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  signerName    String
+  signerEmail   String
+  method        String   @default("typed") // typed | drawn
+  signatureData String   // typed string or base64 PNG of drawn signature
+  ipAddress     String?
+  userAgent     String?
+  documentSha256 String
+  consent       Boolean  @default(false)
+  signedAt      DateTime @default(now()) // UTC
+}
+
+model SignedDocument {
+  id            String   @id @default(cuid())
+  proposalId    String   @unique
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  storageKey    String   // immutable object-storage key
+  sha256        String
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Billing (Layer B — firm charges its own clients)
+// ---------------------------------------------------------------------------
+model ClientPaymentMandate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proposalId    String?  @unique
+  proposal      Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  contactId     String?
+  status        MandateStatus @default(pending)
+  providerRef   String?  // Stitch DebiCheck mandate reference
+  payerName     String?
+  payerReference String? // max 12 chars (enforced in code)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proposalId    String?
+  proposal      Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  number        String
+  kind          InvoiceKind @default(full)
+  status        InvoiceStatus @default(draft)
+  currency      String   @default("ZAR")
+  taxMode       TaxMode  @default(inclusive)
+  subtotalCents Int      @default(0)
+  taxCents      Int      @default(0)
+  totalCents    Int      @default(0)
+  amountPaidCents Int    @default(0)
+  clientName    String
+  clientEmail   String
+  issueAt       DateTime? // future-dated issuance supported
+  dueAt         DateTime?
+  issuedAt      DateTime?
+  paidAt        DateTime?
+  xeroInvoiceId String?
+  publicTokenHash String? @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lineItems     InvoiceLineItem[]
+  payments      Payment[]
+  views         InvoiceView[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model InvoiceLineItem {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  quantity      Int      @default(1)
+  unitPriceCents Int
+  taxMode       TaxMode  @default(inclusive)
+  taxRatePct    Decimal  @db.Decimal(5, 2) @default(15.00)
+  position      Int      @default(0)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  tenantId      String
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amountCents   Int
+  currency      String   @default("ZAR")
+  status        PaymentStatus @default(pending)
+  providerRef   String?  // Stitch payment request id
+  providerUrl   String?  // hosted payment page url
+  externalReference String? // carries tenantId+invoiceId, max 4096
+  method        String?  // pay_by_bank | card | debicheck
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  attempts      PaymentAttempt[]
+
+  @@index([tenantId])
+  @@index([providerRef])
+}
+
+model BillingSchedule {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  proposalId    String?
+  proposal      Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  mandateId     String?
+  amountCents   Int
+  currency      String   @default("ZAR")
+  interval      RecurringInterval @default(monthly)
+  nextRunAt     DateTime
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([nextRunAt])
+}
+
+model PaymentAttempt {
+  id            String   @id @default(cuid())
+  paymentId     String
+  payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  status        PaymentStatus
+  failureReason String?
+  attemptedAt   DateTime @default(now())
+  nextRetryAt   DateTime?
+
+  @@index([paymentId])
+}
+
+model InvoiceView {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  ipAddress     String?
+  userAgent     String?
+  viewedAt      DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Forms
+// ---------------------------------------------------------------------------
+model Form {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String
+  description   String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  fields        FormField[]
+  submissions   FormSubmission[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+}
+
+model FormField {
+  id            String   @id @default(cuid())
+  formId        String
+  form          Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  label         String
+  key           String
+  type          FormFieldType @default(text)
+  required      Boolean  @default(false)
+  options       String[] // for select
+  position      Int      @default(0)
+
+  @@index([formId])
+}
+
+model FormSubmission {
+  id            String   @id @default(cuid())
+  formId        String
+  form          Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  tenantId      String
+  data          Json
+  contactId     String?
+  createdAt     DateTime @default(now())
+
+  @@index([formId])
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// System
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorId       String?
+  action        String
+  entity        String?
+  entityId      String?
+  metadata      Json     @default("{}")
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Job {
+  id            String   @id @default(cuid())
+  type          String
+  payload       Json     @default("{}")
+  status        JobStatus @default(pending)
+  runAt         DateTime @default(now())
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5)
+  lastError     String?
+  lockedAt      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, runAt])
+}
+
+model WebhookEvent {
+  id            String   @id @default(cuid())
+  source        String   // stitch | xero
+  idempotencyKey String  @unique
+  payload       Json
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+}
+
+model NotificationLog {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  to            String
+  template      String
+  subject       String?
+  status        String   @default("sent") // sent | failed | mocked
+  providerRef   String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+}
