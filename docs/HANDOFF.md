@@ -21,9 +21,21 @@ noted, and supply credentials. Mocks remain the default.
 
 ## Deploy configuration
 
-- **Vercel** team `brunel-studios-team`, two projects (`web`, `api`) from this
-  repo. If a Vercel token is not in the environment, see `docs/RUNBOOK.md` for
-  manual deploy steps. (No Vercel token was available during the build.)
+- **Vercel** team `brunel-studios-team`. The repo deploys as **one** project
+  (`claude-mcp-routines-api`) via the root `vercel.json`: the Angular SPA is
+  served at `/` and the NestJS API runs as a serverless function at `/api/*`
+  (same origin). See `docs/RUNBOOK.md` → Vercel for the full setup.
+- **Action required in the Vercel dashboard (one-time):**
+  1. Project → Settings → **Environment Variables**: set at least `DATABASE_URL`,
+     `ENCRYPTION_MASTER_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and
+     `PLATFORM_HOSTS` (include the deployment domain). Without `DATABASE_URL` the
+     SPA loads and `/api/health/live` responds, but DB-backed routes return errors.
+  2. After setting `DATABASE_URL`, apply schema + demo data once:
+     `pnpm prisma migrate deploy` and `pnpm db:seed` against the prod DB.
+  3. If the project's **Output Directory**/**Framework Preset** were set by the
+     initial NestJS auto-detection, leave them — `vercel.json` builds the SPA to
+     `web/` and the API bundle to `dist/apps/api/`, which the committed config
+     already targets.
 - **GitHub** org `abrunel-source`. CI runs on every push/PR.
 - **Custom domains** — add `CustomDomain` rows per tenant and configure DNS +
   TLS; set `APP_ROOT_DOMAIN` and `PLATFORM_HOSTS`.
