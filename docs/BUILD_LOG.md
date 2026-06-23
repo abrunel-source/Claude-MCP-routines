@@ -84,6 +84,21 @@ Per-phase record of what was built. Newest first within each phase.
 - `pnpm lint` clean · `pnpm typecheck` clean · `pnpm test` **15/15 green**
   (incl. tenant-isolation + the sell→sign→pay e2e) · `pnpm build` succeeds.
 
+## Web console (Angular) ✅ (shell + themed prospect wizard)
+- Angular 18 standalone + signals app that builds (`pnpm nx run web:build`).
+- **Runtime white-label theming**: `ThemeService` fetches `/api/tenant/context`
+  and applies brand colours via CSS custom properties — no rebuild per tenant.
+- Pages: landing, firm login (calls the API, stores the access token),
+  dashboard shell (`/app`, guarded), and the **themed public proposal wizard**
+  (`/p/:token`) implementing the strict 5-step flow (cover → packages → terms →
+  signature → confirmation) against the public API, including the upfront-payment
+  call-to-action and the document hash on completion.
+- The full Material-themed firm console (the §11 IA: Home/Clients/Deals/
+  Proposals/Services/Library/Invoices/Billing/Forms/Settings) builds on this
+  scaffold — next increment, see HANDOFF.
+- Webhook idempotency module added (Stitch): signature verify + `WebhookEvent`
+  dedup + reconciliation; mandatory duplicate-no-double-effect test passes.
+
 ## Status of remaining phases
 - **Phase 4 (Layer-B payments):** upfront pay + mandate + schedule done at sign;
   still to do — hosted invoice views, `InvoiceView` open-tracking, webhook

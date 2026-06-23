@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "nx run api:build",
+    "build": "nx run-many -t build --projects=api,web",
     "test": "jest --config apps/api/jest.config.js --passWithNoTests",
     "lint": "eslint \"apps/**/src/**/*.ts\" \"libs/**/src/**/*.ts\"",
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit",
@@ -40,12 +40,15 @@
     "ts-jest": "29.2.5",
     "ts-loader": "9.5.1",
     "ts-node": "10.9.2",
-    "typescript": "5.6.3"
+    "typescript": "5.5.4"
   },
   "dependencies": {
     "@prisma/client": "6.1.0"
   },
   "pnpm": {
+    "overrides": {
+      "typescript": "5.5.4"
+    },
     "onlyBuiltDependencies": [
       "@nestjs/core",
       "@prisma/client",
