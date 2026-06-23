@@ -3,6 +3,24 @@ import { PrismaClient } from '@prisma/client';
 import { tenantScopeExtension } from '@cadence/core';
 
 /**
+ * Resolve the database connection string from whichever env var is present.
+ * Vercel Postgres / Neon integrations inject different names depending on
+ * version, so we accept all of them and fall back to DATABASE_URL.
+ */
+function resolveDatabaseUrl(): string {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_URL ||
+    // Valid-format placeholder so PrismaClient construction never throws when no
+    // database is configured; queries fail gracefully and are caught at runtime.
+    'postgresql://unconfigured:unconfigured@127.0.0.1:5432/unconfigured'
+  );
+}
+
+/**
  * PrismaService owns the connection and exposes a tenant-scoped client. The
  * tenant-scope extension reads the active tenant from AsyncLocalStorage at query
  * time, so a single extended client serves every request safely.
@@ -12,7 +30,9 @@ import { tenantScopeExtension } from '@cadence/core';
  */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  private readonly base = new PrismaClient();
+  private readonly base = new PrismaClient({
+    datasources: { db: { url: resolveDatabaseUrl() } },
+  });
   readonly client = this.base.$extends(tenantScopeExtension());
 
   async onModuleInit(): Promise<void> {

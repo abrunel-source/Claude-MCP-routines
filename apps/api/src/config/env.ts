@@ -24,7 +24,14 @@ export const env = {
   apiPort: int('API_PORT', 3000),
   apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3000',
   appRootDomain: process.env.APP_ROOT_DOMAIN ?? 'cadence.co.za',
-  platformHosts: (process.env.PLATFORM_HOSTS ?? 'localhost')
+  platformHosts: (
+    process.env.PLATFORM_HOSTS ??
+    // Default to localhost plus the Vercel production/deployment domains so the
+    // platform surface (and platform-admin login) resolves without extra config.
+    ['localhost', process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_URL]
+      .filter(Boolean)
+      .join(',')
+  )
     .split(',')
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean),
