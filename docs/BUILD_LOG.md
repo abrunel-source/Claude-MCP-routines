@@ -109,3 +109,64 @@ Per-phase record of what was built. Newest first within each phase.
 - **Phase 6 (Xero, reporting, notifications, forms):** ports + mocks exist;
   feature modules not yet built.
 See `docs/HANDOFF.md` and the final summary below.
+
+---
+
+## Final summary
+
+### What was built (running, verified)
+A genuinely working full-stack foundation and the core "sell → sign → bill →
+get paid" engine for a multi-tenant, white-label SA professional-services SaaS:
+
+- **Monorepo & tooling** — Nx + pnpm; strict TypeScript; ESLint/Prettier;
+  Husky pre-commit; GitHub Actions CI (Postgres service → migrate → lint →
+  typecheck → test → build); Dockerfile (Cloud Run artifact); docker-compose
+  Postgres; complete `.env.example`; demo seed.
+- **Data model** — the full §8 Prisma schema (platform, tenant, identity, CRM,
+  library, engagements, Layer-B billing, forms, system) on PostgreSQL 15, with
+  an applied migration.
+- **Ports & adapters** — every vendor behind an interface with a real adapter
+  **and** a working mock (Stitch, Xero, Resend, S3 storage, pdfmake, AES-GCM
+  key provider, Postgres job ports); env-flag selection.
+- **Phase 1** — JWT auth (rotating refresh + reuse detection), argon2id,
+  lockout, email verify, password reset, invitations; Host-based tenancy +
+  AsyncLocalStorage + Prisma tenant-scoping extension; 5 roles + guard; runtime
+  white-label branding. **Mandatory cross-tenant isolation test passes.**
+- **Phase 2** — CRM (orgs, contacts, deals kanban, activities, tags, search).
+- **Phase 3** — library content; proposal compose/send; the strict ordered,
+  tenant-themed prospect wizard; per-step `ProposalEvent` tracking (IP/UA/UTC +
+  view count); e-sign with an immutable SHA-256-hashed PDF stored + emailed to
+  both parties (ECTA audit trail). **Sell→sign→pay e2e passes.**
+- **Phase 4 (partial)** — upfront payment + DebiCheck mandate + recurring
+  `BillingSchedule` captured at sign; Stitch webhook endpoint with signature
+  verification + idempotency + reconciliation. **Mandatory duplicate-webhook
+  test passes.**
+- **Web** — Angular 18 app that builds: runtime-themed landing, login,
+  dashboard shell, and the public proposal wizard.
+
+Verification at hand-off: `pnpm lint` clean · `pnpm typecheck` clean ·
+`pnpm test` **16/16 green** (incl. tenant-isolation, sign-to-pay e2e, webhook
+idempotency) · `pnpm build` builds api + web · API boots and serves
+health/auth/tenant/proposal endpoints against live Postgres.
+
+### What runs on mocks (pending credentials)
+All external integrations default to mocks so the product is demoable end-to-end
+now: **Stitch** payments (Layer A & B), **Xero** accounting, **Resend** email,
+and **S3** storage (in-memory fallback). Flip each to real via its `*_PROVIDER`
+flag + credentials. See `docs/HANDOFF.md`.
+
+### Exact next steps (from HANDOFF)
+1. Provide production **Stitch** credentials (JWKS client assertion) and finish
+   the live mutations in `StitchPaymentProvider` (`// TODO(production-credentials)`).
+2. Provide **Xero** app credentials; complete `XeroAccountingProvider` mappings.
+3. Provide **Resend** API key + verified sender domain; **S3-compatible** storage
+   credentials; production `ENCRYPTION_MASTER_KEY` and JWT secrets.
+4. Configure Vercel projects (web + api serverless handler) and custom domains.
+5. Build out the remaining feature work: full Material firm console (§11 IA),
+   hosted invoice views + `InvoiceView` tracking + dunning/retries (Phase 4),
+   Layer-A plan-limit gating + admin console + metrics (Phase 5), Xero sync +
+   reporting dashboards + full notification set + form builder (Phase 6).
+6. Supply real branding/logos and finalised legal terms (engagement, ToS, POPIA).
+7. Optionally drop the 19 Ignition `.webarchive` files into `reference/ignition/`
+   to refine the schema/IA (Phase A was skipped — none were present).
+
