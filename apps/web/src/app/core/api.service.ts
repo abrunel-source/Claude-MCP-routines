@@ -53,8 +53,84 @@ export class ApiService {
     );
   }
 
-  me(): Observable<unknown> {
+  me(): Observable<any> {
     return this.http.get(`${API_BASE}/auth/me`, { headers: this.headers() });
+  }
+
+  // --- Generic authed helpers ---------------------------------------------
+  private get<T>(path: string): Observable<T> {
+    return this.http.get<T>(`${API_BASE}${path}`, { headers: this.headers() });
+  }
+  private post<T>(path: string, body: unknown): Observable<T> {
+    return this.http.post<T>(`${API_BASE}${path}`, body, { headers: this.headers() });
+  }
+
+  // --- CRM -----------------------------------------------------------------
+  listOrganizations(q = ''): Observable<any[]> {
+    return this.get(`/crm/organizations${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  }
+  createOrganization(body: { name: string; website?: string; vatNumber?: string }): Observable<any> {
+    return this.post(`/crm/organizations`, body);
+  }
+  listContacts(q = ''): Observable<any[]> {
+    return this.get(`/crm/contacts${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  }
+  createContact(body: {
+    firstName: string;
+    lastName?: string;
+    email: string;
+    phone?: string;
+    organizationId?: string;
+  }): Observable<any> {
+    return this.post(`/crm/contacts`, body);
+  }
+  listDeals(stage = ''): Observable<any[]> {
+    return this.get(`/crm/deals${stage ? `?stage=${stage}` : ''}`);
+  }
+  createDeal(body: {
+    title: string;
+    stage?: string;
+    valueCents?: number;
+    organizationId?: string;
+    contactId?: string;
+  }): Observable<any> {
+    return this.post(`/crm/deals`, body);
+  }
+  moveDeal(id: string, stage: string, position: number): Observable<any> {
+    return this.http.patch(`${API_BASE}/crm/deals/${id}/move`, { stage, position }, { headers: this.headers() });
+  }
+  listActivities(): Observable<any[]> {
+    return this.get(`/crm/activities`);
+  }
+  listTags(): Observable<any[]> {
+    return this.get(`/crm/tags`);
+  }
+
+  // --- Library -------------------------------------------------------------
+  listServices(): Observable<any[]> {
+    return this.get(`/library/services`);
+  }
+  createService(body: {
+    name: string;
+    pricingType?: string;
+    defaultPriceCents?: number;
+    recurringInterval?: string;
+  }): Observable<any> {
+    return this.post(`/library/services`, body);
+  }
+  listPackages(): Observable<any[]> {
+    return this.get(`/library/packages`);
+  }
+
+  // --- Proposals -----------------------------------------------------------
+  listProposals(): Observable<any[]> {
+    return this.get(`/proposals`);
+  }
+  getProposal(id: string): Observable<any> {
+    return this.get(`/proposals/${id}`);
+  }
+  sendProposal(id: string): Observable<any> {
+    return this.post(`/proposals/${id}/send`, {});
   }
 
   publicProposal(token: string): Observable<any> {
