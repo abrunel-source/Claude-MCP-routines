@@ -25,6 +25,19 @@ noted, and supply credentials. Mocks remain the default.
   (`claude-mcp-routines-api`) via the root `vercel.json`: the Angular SPA is
   served at `/` and the NestJS API runs as a serverless function at `/api/*`
   (same origin). See `docs/RUNBOOK.md` → Vercel for the full setup.
+- **Known Vercel blockers to clear (one-time, dashboard only — cannot be done
+  via API/committed files):**
+  - **Builds being CANCELED before they start** (no build logs): this is a
+    team-level condition — Vercel build **concurrency** or a **usage/spend cap**.
+    Check the team's Usage/Billing and cancel any stuck builds, then redeploy.
+  - **Framework Preset**: the project auto-detected as **NestJS**, which forces
+    the Output Directory to the Nx project name (`web`) and ignores
+    `vercel.json#outputDirectory`, causing `No Output Directory named "web"`.
+    Set **Project → Settings → Build & Deployment → Framework Preset = Other**
+    (and, if shown, Output Directory = `dist/apps/web`). The repo already
+    flattens the Angular output to `dist/apps/web/index.html` and declares the
+    Nx build `outputs`, so once the preset is "Other" the committed `vercel.json`
+    is authoritative.
 - **Action required in the Vercel dashboard (one-time):**
   1. Project → Settings → **Environment Variables**: set at least `DATABASE_URL`,
      `ENCRYPTION_MASTER_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, and
