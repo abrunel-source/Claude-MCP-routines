@@ -21,17 +21,35 @@ docker run -p 3000:3000 --env-file .env cadence-api
 
 ## Deploy
 
-### Vercel (interim)
-Two projects from this monorepo under team `brunel-studios-team`:
-- **api** — build `pnpm nx run api:build`, output `dist/apps/api`, serverless
-  handler wrapping the Nest app; webhook routes are dedicated functions with
-  raw-body access (`rawBody: true` is enabled in `main.ts`).
-- **web** — Angular build, output the web `dist`.
+### Vercel (interim) — single combined project
 
-Inject all secrets as environment variables (see `.env.example`). Run
-`pnpm prisma migrate deploy` against the production database on release.
-If no Vercel token is present in the environment, deploy via the Vercel
-dashboard or `vercel --prod` locally with the project linked.
+The repo deploys as **one** Vercel project (root `vercel.json`) that serves the
+Angular SPA at `/` and the NestJS API as a serverless function at `/api/*`
+(same origin — the web's `/api` calls work with no CORS/proxy):
+
+- `buildCommand`: `pnpm run vercel-build` → builds the Angular app
+  (`dist/apps/web`) **and** the API serverless bundle (`dist/apps/api/serverless.js`).
+- `outputDirectory`: `dist/apps/web` (static SPA, with a rewrite to `index.html`).
+- Function `api/[[...path]].js` re-exports the bundled Nest handler; webhook raw
+  body works (`rawBody: true` in `app.factory.ts`).
+- Set **Project → Settings → Framework Preset = Other** (the root `vercel.json`
+  already sets `framework: null`; do not use the NestJS preset).
+
+**Required environment variables** (Project → Settings → Environment Variables):
+
+| Var | Needed for | Notes |
+|---|---|---|
+| `DATABASE_URL` | all DB features | Supabase Postgres connection string |
+| `ENCRYPTION_MASTER_KEY` | tenant secret encryption | `openssl rand -base64 32` |
+| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | auth | strong random strings |
+| `PLATFORM_HOSTS` | tenant routing | include the deployment domain so it maps to the platform surface, e.g. `your-app.vercel.app` |
+| `APP_ROOT_DOMAIN` | subdomain tenants | e.g. `cadence.co.za` |
+| `*_PROVIDER` + vendor keys | real Stitch/Xero/Resend/S3 | optional; default to mocks |
+
+After setting `DATABASE_URL`, apply schema + demo data once:
+`pnpm prisma migrate deploy` and `pnpm db:seed` (run locally against the prod DB,
+or from a one-off job). Until `DATABASE_URL` is set the SPA still loads and
+`/api/health/live` responds; DB-backed routes return errors by design.
 
 ### GCP (target)
 - API → Cloud Run from `apps/api/Dockerfile`, region `africa-south1`.
