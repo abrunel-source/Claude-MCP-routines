@@ -11,7 +11,7 @@
   "scripts": {
     "build": "(cd apps/api && pnpm exec nest build) && (cd apps/web && pnpm exec ng build)",
     "build:serverless": "webpack --config apps/api/webpack.serverless.config.js",
-    "vercel-build": "(cd apps/web && pnpm exec ng build) && pnpm run build:serverless && rm -rf public && cp -r dist/apps/web public && echo \"=== CP_DONE pwd=$(pwd) ===\" && ls -la public && test -f public/index.html && echo PUBLIC_INDEX_OK",
+    "vercel-build": "(cd apps/web && pnpm exec ng build) && pnpm run build:serverless && rm -rf public && cp -r dist/apps/web public",
     "test": "jest --config apps/api/jest.config.js --passWithNoTests",
     "lint": "eslint \"apps/**/src/**/*.ts\" \"libs/**/src/**/*.ts\"",
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit",
