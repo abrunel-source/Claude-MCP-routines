@@ -11,7 +11,7 @@
   "scripts": {
     "build": "nx run-many -t build --projects=api,web",
     "build:serverless": "webpack --config apps/api/webpack.serverless.config.js",
-    "vercel-build": "pnpm nx run web:build && pnpm run build:serverless && rm -rf public && cp -r dist/apps/web public",
+    "vercel-build": "pnpm nx run web:build && pnpm run build:serverless && rm -rf public web && cp -r dist/apps/web public && cp -r dist/apps/web web && echo '--- output dirs ---' && ls -la dist/apps/web public web",
     "test": "jest --config apps/api/jest.config.js --passWithNoTests",
     "lint": "eslint \"apps/**/src/**/*.ts\" \"libs/**/src/**/*.ts\"",
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit",
