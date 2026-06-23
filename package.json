@@ -11,7 +11,7 @@
   "scripts": {
     "build": "(cd apps/api && pnpm exec nest build) && (cd apps/web && pnpm exec ng build)",
     "build:serverless": "webpack --config apps/api/webpack.serverless.config.js",
-    "vercel-build": "(cd apps/web && pnpm exec ng build) && pnpm run build:serverless && rm -rf public && cp -r dist/apps/web public && bash scripts/db-setup.sh",
+    "vercel-build": "pnpm prisma generate --schema prisma/schema.prisma && (cd apps/web && pnpm exec ng build) && pnpm run build:serverless && rm -rf public && cp -r dist/apps/web public && bash scripts/db-setup.sh",
     "test": "jest --config apps/api/jest.config.js --passWithNoTests",
     "lint": "eslint \"apps/**/src/**/*.ts\" \"libs/**/src/**/*.ts\"",
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit",
