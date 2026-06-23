@@ -20,3 +20,5 @@ prisma/*.db
 
 # Vercel static output (copied from dist/apps/web)
 /public
+/apps/web/public
+/apps/web/dist
