@@ -42,18 +42,29 @@ export class DashboardComponent implements OnInit {
   error = signal('');
 
   ngOnInit(): void {
-    if (!this.api.accessToken()) {
-      this.router.navigate(['/login']);
+    if (this.api.accessToken()) {
+      this.loadMe();
       return;
     }
+    // Login is disabled for this deployment — start a passwordless demo session.
+    this.api.demoLogin().subscribe({
+      next: (res) => {
+        this.api.setToken(res.accessToken);
+        this.loadMe();
+      },
+      error: () => this.error.set('Could not start demo session.'),
+    });
+  }
+
+  private loadMe(): void {
     this.api.me().subscribe({
       next: (u) => this.me.set(u),
-      error: () => this.error.set('Session expired — please sign in again.'),
+      error: () => this.error.set('Session error — could not load your profile.'),
     });
   }
 
   logout(): void {
     this.api.setToken(null);
-    this.router.navigate(['/login']);
+    this.router.navigate(['/app']);
   }
 }

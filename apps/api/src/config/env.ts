@@ -21,6 +21,9 @@ function mode(name: string): AdapterMode {
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  // Passwordless demo session (skips password verification). Enabled by default;
+  // set DEMO_LOGIN=false to require real credentials in production.
+  demoLogin: process.env.DEMO_LOGIN !== 'false',
   apiPort: int('API_PORT', 3000),
   apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3000',
   appRootDomain: process.env.APP_ROOT_DOMAIN ?? 'cadence.co.za',

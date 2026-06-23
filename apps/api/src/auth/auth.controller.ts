@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  NotFoundException,
   Post,
   Query,
   Req,
@@ -49,6 +50,20 @@ export class AuthController {
   @Post('signup')
   async signup(@Body() dto: SignupDto, @Res({ passthrough: true }) res: Response): Promise<AuthTokens> {
     const { tokens, refreshToken } = await this.auth.signup(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return tokens;
+  }
+
+  @Public()
+  @Post('demo-login')
+  @HttpCode(200)
+  async demoLogin(@Res({ passthrough: true }) res: Response): Promise<AuthTokens> {
+    if (!env.demoLogin) {
+      throw new NotFoundException();
+    }
+    // eslint-disable-next-line no-console
+    console.log('[auth] demo-login invoked');
+    const { tokens, refreshToken } = await this.auth.demoLogin();
     this.setRefreshCookie(res, refreshToken);
     return tokens;
   }

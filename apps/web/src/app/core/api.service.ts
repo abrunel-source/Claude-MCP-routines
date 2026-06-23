@@ -44,6 +44,15 @@ export class ApiService {
     );
   }
 
+  /** Passwordless demo session (login is disabled for this deployment). */
+  demoLogin(): Observable<{ accessToken: string }> {
+    return this.http.post<{ accessToken: string }>(
+      `${API_BASE}/auth/demo-login`,
+      {},
+      { withCredentials: true },
+    );
+  }
+
   me(): Observable<unknown> {
     return this.http.get(`${API_BASE}/auth/me`, { headers: this.headers() });
   }

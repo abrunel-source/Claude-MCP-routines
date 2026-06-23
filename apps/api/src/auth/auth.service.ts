@@ -80,6 +80,30 @@ export class AuthService {
     return { tokens, refreshToken, tenantSlug: tenant.slug };
   }
 
+  /**
+   * Passwordless session for demo deployments. Issues tokens for the platform
+   * admin (or any seeded user) without verifying a password — deliberately
+   * skips argon2 so the demo works regardless of native-module availability.
+   */
+  async demoLogin(): Promise<{ tokens: AuthTokens; refreshToken: string }> {
+    const user =
+      (await this.prisma.raw.user.findFirst({
+        where: { isPlatformAdmin: true },
+        include: { memberships: true },
+      })) ?? (await this.prisma.raw.user.findFirst({ include: { memberships: true } }));
+    if (!user) {
+      throw new UnauthorizedException('No users available for demo login');
+    }
+    const membership = user.memberships[0];
+    return this.issueTokens(
+      user.id,
+      user.email,
+      user.isPlatformAdmin,
+      membership?.tenantId,
+      membership?.role as Role | undefined,
+    );
+  }
+
   // --- Login ---------------------------------------------------------------
   async login(dto: LoginDto): Promise<{ tokens: AuthTokens; refreshToken: string }> {
     const user = await this.prisma.raw.user.findUnique({
