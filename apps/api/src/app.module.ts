@@ -8,6 +8,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
 import { CrmModule } from './crm/crm.module';
 import { LibraryModule } from './library/library.module';
 import { ProposalsModule } from './proposals/proposals.module';
+import { PaymentsModule } from './payments/payments.module';
 import { TenantContextMiddleware } from './tenancy/tenant-context.middleware';
 import { JwtAuthGuard, RolesGuard } from './common/guards';
 
@@ -21,6 +22,7 @@ import { JwtAuthGuard, RolesGuard } from './common/guards';
     CrmModule,
     LibraryModule,
     ProposalsModule,
+    PaymentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
